@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import BottomNav from '../components/BottomNav.jsx'
 import { IconMore } from '../components/Icons.jsx'
 import { useStore } from '../data/store.jsx'
@@ -9,7 +9,8 @@ import { CATS, SEASONS, won } from '../data/samples.js'
 export default function Closet() {
   const { items, updateItem } = useStore()
   const navigate = useNavigate()
-  const [tab, setTab] = useState('own')
+  const location = useLocation()
+  const [tab, setTab] = useState((location.state && location.state.tab) || 'own')
   const [cat, setCat] = useState('all')
   const [sheet, setSheet] = useState(null)
 
@@ -110,6 +111,13 @@ function ItemSheet({ sel, onClose, updateItem, onBoard, onEdit }) {
           <input type="text" className="field" defaultValue={sel.brand} placeholder="브랜드 입력" onChange={(e) => updateItem(sel.id, { brand: e.target.value })}
             style={{ flexGrow: 1, minWidth: 0 }} />
         </label>
+        <div role="group" aria-label="카테고리" style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', margin: '0 -16px', padding: '0 16px', scrollbarWidth: 'none' }}>
+          <span style={{ flex: '0 0 44px', fontSize: 14, fontWeight: 500 }}>종류</span>
+          {Object.entries(CATS).filter(([k]) => k !== 'all').map(([k, n]) => (
+            <button key={k} type="button" className="chip" aria-pressed={sel.cat === k} style={{ flexShrink: 0, padding: '0 14px' }}
+              onClick={() => updateItem(sel.id, { cat: k })}>{n}</button>
+          ))}
+        </div>
         <div role="group" aria-label="입는 계절" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ flexGrow: 1, fontSize: 14, fontWeight: 500 }}>계절</span>
           {SEASONS.map(([k, n]) => {
