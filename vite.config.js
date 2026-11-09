@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png', 'samples/*.svg'],
       manifest: {
-        name: '룩보드',
-        short_name: '룩보드',
-        description: '내 옷을 모아 플랫레이 코디를 짜는 룩보드',
+        name: 'DropFit',
+        short_name: 'DropFit',
+        description: '내 옷을 모아 플랫레이 코디를 짜는 DropFit',
         lang: 'ko',
         start_url: '/',
         display: 'standalone',

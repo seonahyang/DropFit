@@ -8,7 +8,7 @@ export default function Placeholder({ title, nav, links = [] }) {
     <div className="app">
       <main className="scroll" style={{ padding: '0 0 104px' }}>
         <header style={{ padding: '22px 16px 8px' }}>
-          <Link to="/" style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.05em' }}>룩보드</Link>
+          <Link to="/" style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em' }}>DropFit</Link>
         </header>
         <h1 style={{ margin: '8px 16px 4px', fontSize: 20, fontWeight: 900 }}>{title}</h1>
         <p style={{ margin: '0 16px 14px', fontSize: 14, color: 'var(--muted-2)' }}>2단계에서 시안 화면으로 바뀌어요</p>
