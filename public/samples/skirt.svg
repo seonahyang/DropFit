@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 340">
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="340" viewBox="0 0 360 340">
 <defs><pattern id="p" width="60" height="60" patternUnits="userSpaceOnUse">
 <rect width="60" height="60" fill="#D8D2C6"></rect><rect width="60" height="20" fill="#7A2F3A" opacity=".55"></rect><rect width="20" height="60" fill="#7A2F3A" opacity=".55"></rect><path d="M40 0V60M0 40H60" stroke="#26262C" stroke-width="2"></path></pattern></defs>
 <path d="M94 34 H266 L346 300 Q250 322 180 322 Q110 322 14 300 Z" fill="url(#p)" stroke="#5B2530" stroke-width="2.5" stroke-linejoin="round"></path>
