@@ -1,8 +1,8 @@
-import { createContext, useContext, useMemo, useState, useCallback } from 'react'
+import { createContext, useContext, useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { SAMPLE_ITEMS, SAMPLE_LOOKS } from './samples.js'
+import { loadAll, writeAll, put, putMany, del } from './db.js'
 
 // 옷(items) · 코디(looks) · 여행(trips) 한곳에서 관리
-// 2단계: 메모리 저장 / 3단계: 같은 액션을 IndexedDB에 쓰도록 연결
 //
 // item  { id, name, brand, cat, own, price, seasons[], tint, h, vw, vh, src }
 // look  { id, name, ratio, bg, placed[{ id(itemId), x, y, w, r, z }], tripId, day, updatedAt }
@@ -11,11 +11,11 @@ import { SAMPLE_ITEMS, SAMPLE_LOOKS } from './samples.js'
 const now = () => Date.now()
 export const uid = (p) => p + '_' + Math.random().toString(36).slice(2, 9)
 
-function seed() {
-  const items = SAMPLE_ITEMS.map((x) => ({ ...x }))
+export function seed() {
+  const items = SAMPLE_ITEMS.map((x, i) => ({ ...x, createdAt: 1000 - i }))
   const trips = [
-    { id: 'jp', name: '일본 3박 4일', days: 4, season: 'winter', note: '', startDate: '2026-12-18', packed: {} },
-    { id: 'je', name: '제주 2박 3일', days: 3, season: 'spring', note: '', startDate: '2026-04-10', packed: {} },
+    { id: 'jp', name: '일본 3박 4일', days: 4, season: 'winter', note: '', startDate: '2026-12-18', packed: {}, createdAt: 2 },
+    { id: 'je', name: '제주 2박 3일', days: 3, season: 'spring', note: '', startDate: '2026-04-10', packed: {}, createdAt: 1 },
   ]
   const L = (id, name, bg, key, tripId, day, t) => ({ id, name, ratio: '4:5', bg, placed: SAMPLE_LOOKS[key].map((q) => ({ ...q })), tripId, day, updatedAt: t })
   const looks = [
@@ -31,49 +31,111 @@ function seed() {
 
 const Ctx = createContext(null)
 
+// 화면은 메모리 상태로 바로 바뀌고, 같은 변경을 IndexedDB에 바로 씀 (새로고침 후에도 유지)
 export function StoreProvider({ children }) {
-  const [db, setDb] = useState(seed)
+  const [db, setDbState] = useState(null)
+  const [error, setError] = useState('')
+  const ref = useRef(null)
+  const setDb = (next) => { ref.current = next; setDbState(next) }
+  const save = (p) => p.catch((e) => console.error('저장 실패', e))
+
+  useEffect(() => {
+    let alive = true
+    loadAll(seed)
+      .then((d) => { if (alive) setDb(d) })
+      .catch((e) => {
+        console.error(e)
+        // 사생활 보호 모드 등 IndexedDB를 못 쓰면 메모리로라도 동작
+        if (alive) { setError('이 브라우저에서는 저장이 안 돼요. 새로고침하면 처음 상태로 돌아가요.'); setDb(seed()) }
+      })
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {})
+    return () => { alive = false }
+  }, [])
 
   const updateItem = useCallback((id, change) => {
-    setDb((d) => ({ ...d, items: d.items.map((x) => (x.id === id ? { ...x, ...change } : x)) }))
+    const d = ref.current
+    const items = d.items.map((x) => (x.id === id ? { ...x, ...change } : x))
+    setDb({ ...d, items })
+    save(put('items', items.find((x) => x.id === id)))
   }, [])
 
   const addItems = useCallback((list) => {
-    setDb((d) => ({ ...d, items: [...list, ...d.items] }))
+    const d = ref.current
+    const t = now()
+    const added = list.map((x, i) => ({ createdAt: t + list.length - i, ...x }))
+    setDb({ ...d, items: [...added, ...d.items] })
+    save(putMany('items', added))
+  }, [])
+
+  const deleteItem = useCallback((id) => {
+    const d = ref.current
+    const x = d.items.find((i) => i.id === id)
+    if (x && x.blob && x.src) URL.revokeObjectURL(x.src)
+    // 이 옷을 쓴 코디에서도 빼기
+    const looks = d.looks.map((l) => (l.placed.some((p) => p.id === id) ? { ...l, placed: l.placed.filter((p) => p.id !== id) } : l))
+    const changed = looks.filter((l, i) => l !== d.looks[i])
+    setDb({ ...d, items: d.items.filter((i) => i.id !== id), looks })
+    save(del('items', id))
+    if (changed.length) save(putMany('looks', changed))
   }, [])
 
   // 코디 저장: 같은 여행 일차에 다른 코디가 있으면 그 코디는 여행에서 빼고(모든 코디에는 남김) 새 코디를 넣음
   const saveLook = useCallback((look) => {
+    const d = ref.current
     const id = look.id || uid('look')
     const next = { ...look, id, updatedAt: now() }
-    setDb((d) => {
-      const others = d.looks
-        .filter((l) => l.id !== id)
-        .map((l) => (next.tripId && l.tripId === next.tripId && l.day === next.day ? { ...l, tripId: null, day: null } : l))
-      return { ...d, looks: [next, ...others] }
-    })
+    const moved = []
+    const others = d.looks
+      .filter((l) => l.id !== id)
+      .map((l) => {
+        if (next.tripId && l.tripId === next.tripId && l.day === next.day) {
+          const m = { ...l, tripId: null, day: null }
+          moved.push(m)
+          return m
+        }
+        return l
+      })
+    setDb({ ...d, looks: [next, ...others] })
+    save(putMany('looks', [next, ...moved]))
     return id
   }, [])
 
+  const deleteLook = useCallback((id) => {
+    const d = ref.current
+    setDb({ ...d, looks: d.looks.filter((l) => l.id !== id) })
+    save(del('looks', id))
+  }, [])
+
   const addTrip = useCallback((trip) => {
-    const t = { id: uid('trip'), packed: {}, startDate: '', ...trip }
-    setDb((d) => ({ ...d, trips: [t, ...d.trips] }))
+    const d = ref.current
+    const t = { id: uid('trip'), packed: {}, startDate: '', createdAt: now(), ...trip }
+    setDb({ ...d, trips: [t, ...d.trips] })
+    save(put('trips', t))
     return t.id
   }, [])
 
   const togglePacked = useCallback((tripId, itemId) => {
-    setDb((d) => ({
-      ...d,
-      trips: d.trips.map((t) => (t.id === tripId ? { ...t, packed: { ...t.packed, [itemId]: !t.packed[itemId] } } : t)),
-    }))
+    const d = ref.current
+    const trips = d.trips.map((t) => (t.id === tripId ? { ...t, packed: { ...t.packed, [itemId]: !t.packed[itemId] } } : t))
+    setDb({ ...d, trips })
+    save(put('trips', trips.find((t) => t.id === tripId)))
+  }, [])
+
+  // 발표 전에 샘플 상태로 되돌리기
+  const resetToSample = useCallback(async () => {
+    const s0 = seed()
+    await writeAll(s0)
+    setDb(await loadAll(seed))
   }, [])
 
   const value = useMemo(() => {
+    if (!db) return null
     const itemById = Object.fromEntries(db.items.map((x) => [x.id, x]))
     const looksSorted = [...db.looks].sort((a, b) => b.updatedAt - a.updatedAt)
-    return { ...db, looks: looksSorted, itemById, updateItem, addItems, saveLook, addTrip, togglePacked }
-  }, [db, updateItem, addItems, saveLook, addTrip, togglePacked])
+    return { ...db, looks: looksSorted, itemById, error, updateItem, addItems, deleteItem, saveLook, deleteLook, addTrip, togglePacked, resetToSample }
+  }, [db, error, updateItem, addItems, deleteItem, saveLook, deleteLook, addTrip, togglePacked, resetToSample])
 
+  if (!value) return <div className="app" aria-busy="true" />
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
