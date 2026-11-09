@@ -8,6 +8,7 @@ import { renderLookPng, saveToPhotos } from '../lib/renderLook.js'
 // 시안: AppBoard.dc.html — 상태 로직(드래그·크기·회전·되돌리기·패널)을 그대로 옮김
 const RATIO_MAP = { '1:1': [1, 1], '4:5': [4, 5], '9:16': [9, 16] }
 const PANEL_MIN = 264
+const PANEL_PEEK = 36 // 아래로 내렸을 때 손잡이만 보이는 높이
 const PANEL_MAX = 640
 const DEFAULT_BG = '#F6F5F2'
 
@@ -40,6 +41,7 @@ export default function Board() {
   const savedId = useRef(existing ? existing.id : null)
   const gesture = useRef(null)
   const panel = useRef(null)
+  const dragEndAt = useRef(0) // 끌기 직후 손잡이 클릭(토글)이 따라 들어오는 것 막기
   const pointers = useRef(new Map())
   const toastTimer = useRef(null)
   const lastSelName = useRef('')
@@ -57,8 +59,8 @@ export default function Board() {
     return () => ro.disconnect()
   }, [])
   const [rw, rh] = RATIO_MAP[st.ratio]
-  const cap = st.ratio === '9:16' ? 280 : 370
-  const boardW = Math.max(120, Math.min(cap, area.w, (area.h * rw) / rh))
+  // 남은 공간을 꽉 채우도록(폭·높이 중 먼저 닿는 쪽에 맞춤)
+  const boardW = Math.max(120, Math.min(area.w, (area.h * rw) / rh))
 
   // ---- 시안 로직 ----
   const find = (id) => stRef.current.placed.find((p) => p.id === id)
@@ -163,7 +165,22 @@ export default function Board() {
   }
 
   // ---- 하단 패널 ----
-  const panelStart = (e) => { panel.current = { sx: e.clientX, sy: e.clientY, h0: stRef.current.panelH, active: false } }
+  // 손가락이 패널 밖으로 나가도 계속 따라가도록 창 전체에서 듣기
+  const panelStart = (e) => {
+    const id = e.pointerId
+    panel.current = { sx: e.clientX, sy: e.clientY, h0: stRef.current.panelH, active: false }
+    const move = (ev) => { if (ev.pointerId === id) panelDragMove(ev) }
+    const up = (ev) => {
+      if (ev.pointerId !== id) return
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      panelEnd(ev)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+  }
   const panelDragMove = (e) => {
     const p = panel.current
     if (!p) return
@@ -172,16 +189,19 @@ export default function Board() {
     if (!p.active) {
       if (Math.abs(dy) < 8 || Math.abs(dy) < Math.abs(dx)) return
       p.active = true
-      try { e.currentTarget.setPointerCapture(e.pointerId) } catch (err) { /* ignore */ }
     }
-    set({ panelDrag: true, panelH: Math.min(panelMax(), Math.max(PANEL_MIN, p.h0 - dy)) })
+    set({ panelDrag: true, panelH: Math.min(panelMax(), Math.max(PANEL_PEEK, p.h0 - dy)) })
   }
   const panelEnd = (e) => {
     const p = panel.current
     panel.current = null
     if (!p || !p.active) return
     const dy = e.clientY - p.sy
-    set({ panelDrag: false, panelH: dy < -40 ? panelMax() : dy > 40 ? PANEL_MIN : p.h0 })
+    dragEndAt.current = Date.now()
+    let h = p.h0
+    if (dy < -40) h = p.h0 <= PANEL_PEEK + 10 && dy > -220 ? PANEL_MIN : panelMax()
+    else if (dy > 40) h = p.h0 >= 360 && dy < 260 ? PANEL_MIN : PANEL_PEEK
+    set({ panelDrag: false, panelH: h })
   }
   const panelMax = () => Math.min(PANEL_MAX, Math.round(window.innerHeight * 0.76))
 
@@ -271,6 +291,8 @@ export default function Board() {
   })
 
   const isWide = s.panelH >= 360
+  const isPeek = s.panelH < 150
+  const spacerH = Math.min(Math.max(s.panelH, PANEL_PEEK), PANEL_MIN)
   const selItem = selP ? itemById[selP.id] : null
 
   return (
@@ -307,7 +329,7 @@ export default function Board() {
 
       {s.menu && <button type="button" aria-label="저장 위치 닫기" onClick={() => set({ menu: false })} style={{ position: 'absolute', inset: 0, zIndex: 7, padding: 0, background: 'none', border: 0 }} />}
 
-      <main ref={mainRef} style={{ flexGrow: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '6px 10px' }}>
+      <main ref={mainRef} style={{ flexGrow: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '4px 8px 10px' }}>
         <h1 className="sr-only">코디 캔버스</h1>
         <div data-board="1" onPointerDownCapture={onBoardDownCapture} onPointerMoveCapture={onBoardMoveCapture} onPointerUpCapture={onBoardUpCapture} onPointerCancelCapture={onBoardUpCapture}
           style={{ position: 'relative', isolation: 'isolate', width: boardW, aspectRatio: `${rw} / ${rh}`, touchAction: 'none' }}>
@@ -350,9 +372,9 @@ export default function Board() {
         </div>
       </main>
 
-      <div aria-hidden="true" style={{ flexShrink: 0, height: PANEL_MIN }} />
+      <div aria-hidden="true" style={{ flexShrink: 0, height: `calc(${spacerH}px + var(--safe-b))`, transition: s.panelDrag ? 'none' : 'height .22s ease' }} />
 
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: s.panelH - 28, zIndex: 5, height: 88, display: 'flex', alignItems: 'flex-start', gap: 6, padding: '8px 14px 0', background: 'var(--surface-2)', borderRadius: '22px 22px 0 0',
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: `calc(${s.panelH - 28}px + var(--safe-b))`, zIndex: 5, height: 88, display: 'flex', alignItems: 'flex-start', gap: 6, padding: '8px 14px 0', background: 'var(--surface-2)', borderRadius: '22px 22px 0 0',
         transform: selP ? 'translateY(0)' : 'translateY(60px)', visibility: selP ? 'visible' : 'hidden',
         transition: s.panelDrag ? 'transform .18s ease, visibility .18s' : 'transform .18s ease, visibility .18s, bottom .22s ease' }}>
         <h2 style={{ margin: 0, flexGrow: 1, minWidth: 0, lineHeight: '44px', fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lastSelName.current}</h2>
@@ -361,12 +383,13 @@ export default function Board() {
         <button type="button" onClick={() => set({ sel: null })} style={{ flexShrink: 0, minHeight: 44, padding: '0 6px', background: 'none', border: 0, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>완료</button>
       </div>
 
-      <section aria-label="옷 고르기" onPointerDown={panelStart} onPointerMove={panelDragMove} onPointerUp={panelEnd} onPointerCancel={panelEnd}
-        style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 6, height: s.panelH, transition: s.panelDrag ? 'none' : 'height .22s ease', display: 'flex', flexDirection: 'column', gap: 8, padding: '0 14px calc(18px + var(--safe-b))', background: 'var(--surface-1)', borderRadius: '28px 28px 0 0' }}>
-        <button type="button" onClick={() => set({ panelH: isWide ? PANEL_MIN : panelMax() })} aria-label={isWide ? '옷 목록 작게 보기' : '옷 목록 크게 보기'}
-          style={{ flexShrink: 0, height: 44, margin: '0 -14px -14px', display: 'flex', justifyContent: 'center', padding: '10px 0 0', background: 'none', border: 0, cursor: 'ns-resize', touchAction: 'none' }}>
+      <section aria-label="옷 고르기" onPointerDown={panelStart}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 6, height: `calc(${s.panelH}px + var(--safe-b))`, overflow: 'hidden', transition: s.panelDrag ? 'none' : 'height .22s ease', display: 'flex', flexDirection: 'column', gap: 8, padding: isPeek ? '0 14px var(--safe-b)' : '0 14px calc(18px + var(--safe-b))', background: 'var(--surface-1)', borderRadius: '28px 28px 0 0' }}>
+        <button type="button" onClick={() => { if (Date.now() - dragEndAt.current < 400) return; set({ panelH: isWide || isPeek ? PANEL_MIN : panelMax() }) }} aria-label={isPeek ? '옷 목록 열기' : isWide ? '옷 목록 작게 보기' : '옷 목록 크게 보기'}
+          style={{ flexShrink: 0, height: isPeek ? PANEL_PEEK : 44, margin: isPeek ? '0 -14px' : '0 -14px -14px', display: 'flex', justifyContent: 'center', padding: '10px 0 0', background: 'none', border: 0, cursor: 'ns-resize', touchAction: 'none' }}>
           <span aria-hidden="true" style={{ width: 44, height: 5, background: 'var(--grabber-panel)', borderRadius: 3 }} />
         </button>
+        {!isPeek && <>
         <div role="group" aria-label="카테고리" style={{ flexShrink: 0, display: 'flex', gap: 16, overflowX: 'auto', margin: '0 -14px', padding: '0 14px', scrollbarWidth: 'none', touchAction: 'pan-x' }}>
           {Object.entries(CATS).map(([k, label]) => (
             <button key={k} type="button" className="tab" aria-pressed={s.cat === k} onClick={() => set({ cat: k })} style={{ flexShrink: 0, fontSize: 15 }}>{label}</button>
@@ -387,6 +410,7 @@ export default function Board() {
         <p style={{ margin: 0, marginTop: 'auto', display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--muted-2)' }}>
           <span>짐 {placedValid.length}개</span><span>총 <b style={{ color: '#FFFFFF' }}>{won(total)}</b> · 살 옷 {won(buy)}</span>
         </p>
+        </>}
       </section>
 
       {s.toast && <p role="status" className="toast">{s.toast}</p>}
