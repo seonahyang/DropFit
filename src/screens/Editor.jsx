@@ -1,46 +1,223 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { IconBack, IconUndo } from '../components/Icons.jsx'
 import { useStore } from '../data/store.jsx'
 
 // 시안: AppEditor.dc.html
-// 2단계: 화면·도구 상태 이식. 실제 지우개/복원(알파 마스크)은 5단계에서 연결.
+// 지우개: 결과 캔버스에서 그 자리를 투명하게(destination-out)
+// 복원:  같은 자리에 원본 픽셀을 다시 그려 넣음(원형 클립 + 원본 drawImage)
 const CHECKER = 'repeating-conic-gradient(#D9DADD 0 25%, #FFFFFF 0 50%)'
 const BG_MAP = { checker: CHECKER, white: '#FFFFFF', black: '#2C2C2E', cobalt: '#1F3BE0', pink: '#F4B9C6' }
 const BG_LABEL = { checker: '체커보드', white: '흰색', black: '검정', cobalt: '코발트', pink: '분홍' }
+const MAX_SIDE = 1600
+const UNDO_LIMIT = 12
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = src
+  })
+}
 
 export default function Editor() {
   const { itemId } = useParams()
   const navigate = useNavigate()
-  const { itemById } = useStore()
+  const { itemById, updateItem } = useStore()
   const item = itemById[itemId]
+
   const [tool, setTool] = useState('erase')
   const [size, setSize] = useState(40)
   const [compare, setCompare] = useState(0)
   const [bg, setBg] = useState('checker')
+  const [ready, setReady] = useState(false)
+  const [undoCount, setUndoCount] = useState(0)
+  const [cursor, setCursor] = useState(null) // { x, y } 화면 좌표(스테이지 기준)
+  const [saving, setSaving] = useState(false)
+  const [hint, setHint] = useState(true)
+
+  const canvasRef = useRef(null)
+  const stageRef = useRef(null)
+  const origRef = useRef(null) // 원본 이미지(같은 크기)
+  const undoRef = useRef([])
+  const strokeRef = useRef(null)
+  const dims = useRef({ w: 1, h: 1 })
+  const [box, setBox] = useState({ w: 0, h: 0 })
+
+  // 처음: 지금 컷을 캔버스에 그리고, 원본을 같은 크기로 준비
+  useEffect(() => {
+    if (!item) return
+    let alive = true
+    ;(async () => {
+      const cut = await loadImage(item.src)
+      const orig = await loadImage(item.srcOrig || item.src)
+      if (!alive) return
+      const k = Math.min(1, MAX_SIDE / Math.max(cut.naturalWidth || item.vw, cut.naturalHeight || item.vh))
+      const w = Math.round((cut.naturalWidth || item.vw) * k)
+      const h = Math.round((cut.naturalHeight || item.vh) * k)
+      dims.current = { w, h }
+      const c = canvasRef.current
+      c.width = w
+      c.height = h
+      c.getContext('2d', { willReadFrequently: true }).drawImage(cut, 0, 0, w, h)
+      const o = document.createElement('canvas')
+      o.width = w
+      o.height = h
+      o.getContext('2d').drawImage(orig, 0, 0, w, h)
+      origRef.current = o
+      setReady(true)
+    })().catch((e) => console.error(e))
+    return () => { alive = false }
+  }, [itemId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 화면에 맞는 캔버스 표시 크기
+  useEffect(() => {
+    const el = stageRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => {
+      const { w, h } = dims.current
+      const aw = e.contentRect.width
+      const ah = e.contentRect.height
+      const s = Math.min(aw / w, ah / h)
+      setBox({ w: Math.floor(w * s), h: Math.floor(h * s) })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ready])
+
   if (!item) return <Navigate to="/" replace />
 
-  const orig = item.srcOrig || item.src
-  const back = () => navigate(-1)
+  const ctx = () => canvasRef.current.getContext('2d', { willReadFrequently: true })
+  const toCanvas = (e) => {
+    const r = canvasRef.current.getBoundingClientRect()
+    const sx = dims.current.w / r.width
+    return { x: (e.clientX - r.left) * sx, y: (e.clientY - r.top) * sx, scale: sx }
+  }
+  const showCursor = (e) => {
+    const r = stageRef.current.getBoundingClientRect()
+    setCursor({ x: e.clientX - r.left, y: e.clientY - r.top })
+  }
+
+  // 점 a→b 구간을 브러시로 칠하기
+  const paint = (a, b, radius) => {
+    const g = ctx()
+    const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / (radius / 3)))
+    if (tool === 'erase') {
+      g.save()
+      g.globalCompositeOperation = 'destination-out'
+      g.lineCap = 'round'
+      g.lineJoin = 'round'
+      g.lineWidth = radius * 2
+      g.beginPath()
+      g.moveTo(a.x, a.y)
+      g.lineTo(b.x + 0.01, b.y)
+      g.stroke()
+      g.restore()
+    } else {
+      g.save()
+      g.beginPath()
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps
+        const x = a.x + (b.x - a.x) * t
+        const y = a.y + (b.y - a.y) * t
+        g.moveTo(x + radius, y)
+        g.arc(x, y, radius, 0, Math.PI * 2)
+      }
+      g.clip()
+      g.globalCompositeOperation = 'source-over'
+      g.drawImage(origRef.current, 0, 0)
+      g.restore()
+    }
+  }
+
+  const onDown = (e) => {
+    if (!ready || e.button > 0) return
+    e.preventDefault()
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch (err) { /* ignore */ }
+    const { w, h } = dims.current
+    undoRef.current.push(ctx().getImageData(0, 0, w, h))
+    if (undoRef.current.length > UNDO_LIMIT) undoRef.current.shift()
+    setUndoCount(undoRef.current.length)
+    setHint(false)
+    const p = toCanvas(e)
+    const radius = (size / 2) * p.scale
+    strokeRef.current = { last: p, radius }
+    paint(p, p, radius)
+    showCursor(e)
+  }
+  const onMove = (e) => {
+    showCursor(e)
+    const s = strokeRef.current
+    if (!s) return
+    const p = toCanvas(e)
+    paint(s.last, p, s.radius)
+    s.last = p
+  }
+  const onUp = () => { strokeRef.current = null; setCursor(null) }
+
+  const undo = () => {
+    const snap = undoRef.current.pop()
+    if (!snap) return
+    ctx().putImageData(snap, 0, 0)
+    setUndoCount(undoRef.current.length)
+  }
+
+  const confirm = async () => {
+    if (!ready) return navigate(-1)
+    if (undoRef.current.length === 0 && item.blob) return navigate(-1)
+    setSaving(true)
+    const blob = await new Promise((r) => canvasRef.current.toBlob(r, 'image/png'))
+    const change = { blob, src: URL.createObjectURL(blob), vw: dims.current.w, vh: dims.current.h }
+    if (!item.origBlob) {
+      // 샘플(SVG) 옷을 처음 고치는 경우: 복원용 원본도 같이 저장
+      const ob = await new Promise((r) => origRef.current.toBlob(r, 'image/png'))
+      change.origBlob = ob
+      change.srcOrig = URL.createObjectURL(ob)
+    }
+    if (item.blob && item.src) URL.revokeObjectURL(item.src)
+    updateItem(item.id, change)
+    navigate(-1)
+  }
 
   return (
     <div className="app">
       <header style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, padding: 'calc(10px + var(--safe-t)) 12px 8px 8px' }}>
-        <button type="button" className="icon-btn" aria-label="뒤로" onClick={back}><IconBack /></button>
-        <h1 style={{ margin: 0, flexGrow: 1, fontSize: 16, fontWeight: 700 }}>{item.name}</h1>
-        <button type="button" className="icon-btn" aria-label="실행 취소" disabled><IconUndo w={2} /></button>
-        <button type="button" onClick={back} style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 18px', background: '#FFFFFF', color: '#000000', border: 0, borderRadius: 999, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>확정</button>
+        <button type="button" className="icon-btn" aria-label="뒤로" onClick={() => navigate(-1)}><IconBack /></button>
+        <h1 style={{ margin: 0, flexGrow: 1, minWidth: 0, fontSize: 16, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</h1>
+        <button type="button" className="icon-btn" aria-label="실행 취소" disabled={undoCount === 0} onClick={undo}><IconUndo w={2} /></button>
+        <button type="button" onClick={confirm} disabled={saving}
+          style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 18px', background: '#FFFFFF', color: '#000000', border: 0, borderRadius: 999, fontSize: 14, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+          {saving ? '저장 중' : '확정'}
+        </button>
       </header>
 
       <main style={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ position: 'relative', flexGrow: 1, minHeight: 0, margin: '0 4px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 14, overflow: 'hidden', borderRadius: 'var(--r-sheet)', background: BG_MAP[bg], backgroundSize: '22px 22px' }}>
-          <div style={{ position: 'relative', width: '100%', maxWidth: 340, maxHeight: '100%', aspectRatio: `${item.vw} / ${item.vh}` }}>
-            <img src={item.src} alt={`배경을 지운 ${item.name}`} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain' }} />
-            <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: '#B8A48C', clipPath: `inset(0 ${100 - compare}% 0 0)` }}>
-              <img src={orig} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain' }} />
+        <div style={{ position: 'relative', flexGrow: 1, minHeight: 0, margin: '0 4px', padding: 14, overflow: 'hidden', borderRadius: 'var(--r-sheet)', background: BG_MAP[bg], backgroundSize: '22px 22px' }}>
+          {hint && (
+            <p style={{ position: 'absolute', top: 10, left: 10, right: 10, zIndex: 3, margin: 0, padding: '10px 14px', background: 'rgba(0,0,0,.82)', color: '#FFFFFF', borderRadius: 16, fontSize: 13, lineHeight: 1.45, pointerEvents: 'none' }}>
+              남은 배경은 지우개로, 잘못 지워진 옷은 복원으로 칠해 보세요.
+            </p>
+          )}
+          <div ref={stageRef} style={{ position: 'absolute', inset: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ position: 'relative', width: box.w || '100%', height: box.h || '100%' }}>
+              <canvas ref={canvasRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onPointerLeave={() => !strokeRef.current && setCursor(null)}
+                aria-label={`${item.name} 컷아웃 편집 영역`}
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'none', cursor: 'crosshair' }} />
+              {compare > 0 && origRef.current && (
+                <>
+                  <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: '#B8A48C', clipPath: `inset(0 ${100 - compare}% 0 0)`, pointerEvents: 'none' }}>
+                    <img src={item.srcOrig || item.src} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
+                  </div>
+                  <div aria-hidden="true" style={{ position: 'absolute', top: -6, bottom: -6, left: compare + '%', width: 2, background: 'var(--accent)', pointerEvents: 'none' }} />
+                </>
+              )}
             </div>
-            {compare > 0 && <div aria-hidden="true" style={{ position: 'absolute', top: -6, bottom: -6, left: compare + '%', width: 2, background: 'var(--accent)' }} />}
+            {cursor && (
+              <span aria-hidden="true" style={{ position: 'absolute', left: cursor.x - size / 2, top: cursor.y - size / 2, width: size, height: size, border: '2px solid var(--accent)', borderRadius: '50%', background: tool === 'restore' ? 'rgba(255,255,255,.35)' : 'rgba(31,59,224,.12)', pointerEvents: 'none' }} />
+            )}
           </div>
+          {!ready && <p style={{ position: 'absolute', inset: 0, margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4E5159', fontSize: 14 }}>불러오는 중…</p>}
         </div>
 
         <section aria-label="편집 도구" style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 16px calc(20px + var(--safe-b))' }}>
