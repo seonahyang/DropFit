@@ -44,4 +44,7 @@ export default defineConfig({
     }),
   ],
   optimizeDeps: { exclude: ['@imgly/background-removal'] },
+  // 배경 제거 멀티스레드(SharedArrayBuffer)용 — 배포(vercel.json)와 같은 헤더
+  server: { headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' } },
+  preview: { headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' } },
 })
