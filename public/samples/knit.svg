@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 420">
+<defs><pattern id="r" width="14" height="14" patternUnits="userSpaceOnUse"><path d="M0 0V14" stroke="#254C41" stroke-width="3"></path></pattern>
+<pattern id="c" width="36" height="40" patternUnits="userSpaceOnUse"><path d="M8 0 Q28 10 8 20 Q28 30 8 40 M28 0 Q8 10 28 20 Q8 30 28 40" fill="none" stroke="#3C7464" stroke-width="3"></path></pattern></defs>
+<path d="M150 40 L100 58 Q78 68 68 92 L18 300 Q16 312 26 314 L70 324 Q80 326 84 316 L112 190 L108 378 L292 378 L288 190 L316 316 Q320 326 330 324 L374 314 Q384 312 382 300 L332 92 Q322 68 300 58 L250 40 Q200 74 150 40 Z" fill="#2F5D50" stroke="#234438" stroke-width="2.5" stroke-linejoin="round"></path>
+<rect x="108" y="100" width="184" height="278" fill="url(#c)" opacity=".85"></rect>
+<path d="M150 40 Q200 74 250 40 L262 48 Q200 96 138 48 Z" fill="#284F44" stroke="#234438" stroke-width="2"></path>
+<path d="M150 40 Q200 74 250 40 L262 48 Q200 96 138 48 Z" fill="url(#r)"></path>
+<rect x="104" y="372" width="192" height="36" rx="5" fill="#284F44" stroke="#234438" stroke-width="2"></rect>
+<rect x="104" y="372" width="192" height="36" rx="5" fill="url(#r)"></rect>
+<g transform="rotate(12 48 306)"><rect x="16" y="292" width="64" height="30" rx="5" fill="#284F44" stroke="#234438" stroke-width="2"></rect><rect x="16" y="292" width="64" height="30" rx="5" fill="url(#r)"></rect></g>
+<g transform="rotate(-12 352 306)"><rect x="320" y="292" width="64" height="30" rx="5" fill="#284F44" stroke="#234438" stroke-width="2"></rect><rect x="320" y="292" width="64" height="30" rx="5" fill="url(#r)"></rect></g>
+</svg>

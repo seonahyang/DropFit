@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 170">
+<defs><pattern id="t" width="30" height="30" patternUnits="userSpaceOnUse"><rect width="30" height="30" fill="#7B4A22"></rect><circle cx="8" cy="10" r="7" fill="#3B2110"></circle><circle cx="23" cy="21" r="6" fill="#B9823F"></circle><circle cx="24" cy="5" r="3.5" fill="#3B2110"></circle></pattern>
+<linearGradient id="l" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A2A22"></stop><stop offset="1" stop-color="#1A1412"></stop></linearGradient></defs>
+<path d="M24 66 L4 24 M336 66 L356 24" stroke="#5B3518" stroke-width="10" stroke-linecap="round"></path>
+<path d="M22 48 H150 Q166 48 166 66 Q164 130 92 136 Q24 134 20 70 Q18 48 22 48 Z" fill="url(#t)" stroke="#2C180A" stroke-width="2"></path>
+<path d="M338 48 H210 Q194 48 194 66 Q196 130 268 136 Q336 134 340 70 Q342 48 338 48 Z" fill="url(#t)" stroke="#2C180A" stroke-width="2"></path>
+<path d="M166 62 Q180 50 194 62 L194 76 Q180 66 166 76 Z" fill="url(#t)" stroke="#2C180A" stroke-width="2"></path>
+<path d="M36 62 H148 Q152 62 152 68 Q148 118 92 122 Q38 120 34 70 Q33 62 36 62 Z" fill="url(#l)"></path>
+<path d="M324 62 H212 Q208 62 208 68 Q212 118 268 122 Q322 120 326 70 Q327 62 324 62 Z" fill="url(#l)"></path>
+<path d="M52 70 L84 104 M232 70 L264 104" stroke="#fff" stroke-width="6" opacity=".14" stroke-linecap="round"></path>
+</svg>
