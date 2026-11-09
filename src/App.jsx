@@ -7,6 +7,7 @@ import Trip from './screens/Trip.jsx'
 import Upload from './screens/Upload.jsx'
 import Editor from './screens/Editor.jsx'
 import Board from './screens/Board.jsx'
+import Lab from './screens/Lab.jsx'
 
 // 라우트 지도 (시안 파일 → 경로)
 //  AppCloset   → /
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/upload" element={<Upload />} />
           <Route path="/editor/:itemId" element={<Editor />} />
           <Route path="/board/:lookId" element={<BoardRoute />} />
+          <Route path="/lab" element={<Lab />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
