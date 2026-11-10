@@ -7,7 +7,7 @@ import { CATS, SEASONS, won } from '../data/samples.js'
 
 // 시안: AppCloset.dc.html
 export default function Closet() {
-  const { items, updateItem } = useStore()
+  const { items, updateItem, deleteItem } = useStore()
   const navigate = useNavigate()
   const location = useLocation()
   const [tab, setTab] = useState((location.state && location.state.tab) || 'own')
@@ -81,13 +81,15 @@ export default function Closet() {
       <BottomNav current="closet" />
 
       {sel && <ItemSheet key={sel.id} sel={sel} onClose={() => setSheet(null)} updateItem={updateItem}
+        onDelete={() => { setSheet(null); deleteItem(sel.id) }}
         onBoard={() => navigate(`/board/new?item=${sel.id}`)}
         onEdit={() => navigate(`/editor/${sel.id}`)} />}
     </div>
   )
 }
 
-function ItemSheet({ sel, onClose, updateItem, onBoard, onEdit }) {
+function ItemSheet({ sel, onClose, updateItem, onBoard, onEdit, onDelete }) {
+  const [confirmDel, setConfirmDel] = useState(false)
   const [priceText, setPriceText] = useState((sel.price || 0).toLocaleString('ko-KR'))
   const label = { display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, fontWeight: 500 }
 
@@ -142,6 +144,10 @@ function ItemSheet({ sel, onClose, updateItem, onBoard, onEdit }) {
           {!sel.own && (
             <button type="button" className="btn-secondary" onClick={() => { updateItem(sel.id, { own: true }); onClose() }}>샀어요, 가진 옷으로 옮기기</button>
           )}
+          <button type="button" onClick={() => (confirmDel ? onDelete() : setConfirmDel(true))}
+            style={{ minHeight: 44, background: 'none', border: 0, color: confirmDel ? '#FF453A' : 'var(--muted-2)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+            {confirmDel ? '한 번 더 누르면 옷장과 코디에서 빠져요' : '옷장에서 삭제'}
+          </button>
         </div>
       </section>
     </div>

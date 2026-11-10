@@ -114,6 +114,16 @@ export function StoreProvider({ children }) {
     return t.id
   }, [])
 
+  // 여행 삭제: 그 여행의 코디는 지우지 않고 "모든 코디"에 남김
+  const deleteTrip = useCallback((tripId) => {
+    const d = ref.current
+    const freed = d.looks.filter((l) => l.tripId === tripId).map((l) => ({ ...l, tripId: null, day: null }))
+    const looks = d.looks.map((l) => freed.find((f) => f.id === l.id) || l)
+    setDb({ ...d, trips: d.trips.filter((t) => t.id !== tripId), looks })
+    save(del('trips', tripId))
+    if (freed.length) save(putMany('looks', freed))
+  }, [])
+
   const togglePacked = useCallback((tripId, itemId) => {
     const d = ref.current
     const trips = d.trips.map((t) => (t.id === tripId ? { ...t, packed: { ...t.packed, [itemId]: !t.packed[itemId] } } : t))
@@ -132,8 +142,8 @@ export function StoreProvider({ children }) {
     if (!db) return null
     const itemById = Object.fromEntries(db.items.map((x) => [x.id, x]))
     const looksSorted = [...db.looks].sort((a, b) => b.updatedAt - a.updatedAt)
-    return { ...db, looks: looksSorted, itemById, error, updateItem, addItems, deleteItem, saveLook, deleteLook, addTrip, togglePacked, resetToSample }
-  }, [db, error, updateItem, addItems, deleteItem, saveLook, deleteLook, addTrip, togglePacked, resetToSample])
+    return { ...db, looks: looksSorted, itemById, error, updateItem, addItems, deleteItem, saveLook, deleteLook, addTrip, deleteTrip, togglePacked, resetToSample }
+  }, [db, error, updateItem, addItems, deleteItem, saveLook, deleteLook, addTrip, deleteTrip, togglePacked, resetToSample])
 
   if (!value) return <div className="app" aria-busy="true" />
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

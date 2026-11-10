@@ -12,6 +12,18 @@ const PANEL_PEEK = 36 // 아래로 내렸을 때 손잡이만 보이는 높이
 const PANEL_MAX = 640
 const DEFAULT_BG = '#F6F5F2'
 
+// 새로 놓는 옷의 기본 자리(종류별 플랫레이 구도, 퍼센트). 같은 종류가 또 오면 조금씩 비켜 놓음
+const SPOTS = {
+  outer: { x: 4, y: 4, w: 46 }, top: { x: 48, y: 4, w: 42 }, bottom: { x: 54, y: 38, w: 38 },
+  shoes: { x: 6, y: 70, w: 40 }, bag: { x: 8, y: 44, w: 36 }, acc: { x: 58, y: 74, w: 30 },
+}
+export function spotFor(item, placed, itemById, z) {
+  const base = SPOTS[item.cat] || { x: 30, y: 30, w: 36 }
+  const same = placed.filter((p) => itemById[p.id] && itemById[p.id].cat === item.cat).length
+  const k = same % 4
+  return { id: item.id, x: base.x + k * 7, y: base.y + k * 6, w: base.w, r: [0, -5, 6, -3][k], z }
+}
+
 function initState(lookId, look, q, trips) {
   const base = { cat: 'all', sel: null, past: [], future: [], saveOpen: false, toast: '', panelH: PANEL_MIN, panelDrag: false, menu: false, more: false, scope: 'all', saving: false }
   if (look) {
@@ -31,7 +43,7 @@ export default function Board() {
   const [q] = useSearchParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { items, itemById, trips, looks, saveLook } = useStore()
+  const { items, itemById, trips, looks, saveLook, deleteLook } = useStore()
   const existing = lookId !== 'new' ? looks.find((l) => l.id === lookId) : null
 
   const [st, setSt] = useState(() => initState(lookId, existing, q, trips))
@@ -39,6 +51,10 @@ export default function Board() {
   stRef.current = st
   const set = (patch) => setSt((prev) => ({ ...prev, ...(typeof patch === 'function' ? patch(prev) : patch) }))
   const savedId = useRef(existing ? existing.id : null)
+  // 저장 안 한 변경이 있는지: 마지막 저장 때의 모양과 비교
+  const sigOf = (x) => JSON.stringify({ n: x.lookName, r: x.ratio, b: x.bg, d: x.dest, p: x.placed.map((q) => [q.id, q.x, q.y, q.w, q.r, q.z]) })
+  const savedSig = useRef(sigOf(st))
+  const png = useRef({ sig: '', blob: null }) // 저장 시트를 열 때 미리 그려 둔 PNG (아이폰 공유 시트는 탭 직후에 열어야 해서)
   const gesture = useRef(null)
   const panel = useRef(null)
   const dragEndAt = useRef(0) // 끌기 직후 손잡이 클릭(토글)이 따라 들어오는 것 막기
@@ -236,15 +252,17 @@ export default function Board() {
 
   const setZ = (z) => commit(s.placed.map((p) => (p.id === s.sel ? { ...p, z } : p)))
 
-  const close = () => {
+  const leave = () => {
     if (location.key !== 'default') navigate(-1)
     else navigate(s.dest !== 'none' ? `/trip/${s.dest.split(':')[0]}` : '/boards')
   }
+  const dirty = placedValid.length > 0 && sigOf(s) !== savedSig.current
+  const close = () => (dirty ? set({ leaveOpen: true, menu: false }) : leave())
 
   const startBoard = () => {
     const itemId = q.get('item')
     if (itemId && itemById[itemId] && !s.placed.some((p) => p.id === itemId)) {
-      set((prev) => ({ setup: false, cat: 'all', placed: prev.placed.concat([{ id: itemId, x: 30, y: 30, w: 36, r: 0, z: prev.nextZ }]), sel: itemId, nextZ: prev.nextZ + 1 }))
+      set((prev) => ({ setup: false, cat: 'all', placed: prev.placed.concat([spotFor(itemById[itemId], prev.placed, itemById, prev.nextZ)]), sel: itemId, nextZ: prev.nextZ + 1 }))
     } else {
       set({ setup: false, cat: 'all' })
     }
@@ -254,6 +272,7 @@ export default function Board() {
     const [tripId, day] = s.dest === 'none' ? [null, null] : [s.dest.split(':')[0], Number(s.dest.split(':')[1])]
     const look = { id: savedId.current || undefined, name: s.lookName.trim() || '새 코디', ratio: s.ratio, bg: s.bg, placed: placedValid, tripId, day }
     const id = saveLook(look)
+    savedSig.current = sigOf(s)
     if (!savedId.current) {
       savedId.current = id
       navigate(`/board/${id}`, { replace: true, state: { keep: true } })
@@ -267,9 +286,11 @@ export default function Board() {
   const saveImage = async () => {
     if (s.saving) return
     set({ saving: true })
+    const sig = sigOf(s)
+    const ready = png.current.sig === sig && png.current.blob
     const look = persist()
     try {
-      const blob = await renderLookPng(look, itemById)
+      const blob = ready || (await renderLookPng(look, itemById))
       const r = await saveToPhotos(blob, look.name)
       set({ saving: false })
       showToast(r === 'cancelled' ? 'DropFit에만 저장했어요' : r === 'downloaded' ? '이미지를 내려받고 DropFit에도 저장했어요' : '사진 앱과 DropFit에 저장했어요')
@@ -277,6 +298,22 @@ export default function Board() {
       set({ saving: false })
       showToast('이미지를 만들지 못했어요. DropFit에는 저장했어요')
     }
+  }
+
+  const openSave = () => {
+    set({ saveOpen: true, menu: false })
+    const sig = sigOf(s)
+    if (png.current.sig === sig) return
+    const look = { name: s.lookName, ratio: s.ratio, bg: s.bg, placed: placedValid }
+    renderLookPng(look, itemById).then((blob) => { png.current = { sig, blob } }).catch(() => {})
+  }
+  const removeLook = () => {
+    if (!s.confirmDel) return set({ confirmDel: true })
+    if (savedId.current) deleteLook(savedId.current)
+    savedSig.current = sigOf({ ...s, placed: [] })
+    set({ more: false, confirmDel: false, placed: [] })
+    if (location.key !== 'default') navigate(-1)
+    else navigate('/boards', { replace: true })
   }
 
   const undo = () => set((p) => {
@@ -321,7 +358,7 @@ export default function Board() {
           </div>
         )}
         <button type="button" className="icon-btn" onClick={() => set({ more: true })} aria-label="더 보기"><IconMore size={24} /></button>
-        <button type="button" onClick={() => set({ saveOpen: true })} aria-label="저장하기"
+        <button type="button" onClick={openSave} aria-label="저장하기"
           style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, background: '#FFFFFF', color: '#000000', border: 0, borderRadius: '50%', cursor: 'pointer', flexShrink: 0 }}>
           <IconDownload />
         </button>
@@ -441,7 +478,7 @@ export default function Board() {
 
       {s.more && (
         <div className="sheet-wrap">
-          <button type="button" className="sheet-scrim" aria-label="닫기" onClick={() => set({ more: false })} />
+          <button type="button" className="sheet-scrim" aria-label="닫기" onClick={() => set({ more: false, confirmDel: false })} />
           <section className="sheet" aria-label="캔버스 설정" style={{ gap: 12, paddingBottom: 'calc(26px + var(--safe-b))' }}>
             <span className="grabber" aria-hidden="true" />
             <h2 style={{ margin: '4px 4px 2px', fontSize: 20, fontWeight: 900, letterSpacing: '-0.03em' }}>캔버스 비율</h2>
@@ -462,6 +499,25 @@ export default function Board() {
               style={{ minHeight: 56, padding: '0 16px', background: 'var(--surface-2)', border: 0, borderRadius: 20, fontSize: 15, fontWeight: 700, textAlign: 'left', cursor: 'pointer' }}>
               쓸 옷과 계절 바꾸기
             </button>
+            {savedId.current && (
+              <button type="button" onClick={removeLook}
+                style={{ minHeight: 56, padding: '0 16px', background: s.confirmDel ? '#FF453A' : 'var(--surface-2)', border: 0, borderRadius: 20, color: s.confirmDel ? '#FFFFFF' : '#FF6961', fontSize: 15, fontWeight: 700, textAlign: 'left', cursor: 'pointer' }}>
+                {s.confirmDel ? '한 번 더 누르면 삭제돼요' : '이 코디 삭제'}
+              </button>
+            )}
+          </section>
+        </div>
+      )}
+
+      {s.leaveOpen && (
+        <div className="sheet-wrap">
+          <button type="button" className="sheet-scrim" aria-label="닫기" onClick={() => set({ leaveOpen: false })} />
+          <section className="sheet" aria-label="나가기 전 확인" style={{ gap: 8, paddingBottom: 'calc(26px + var(--safe-b))' }}>
+            <span className="grabber" aria-hidden="true" />
+            <h2 style={{ margin: '4px 4px 2px', fontSize: 20, fontWeight: 900, letterSpacing: '-0.03em' }}>저장하지 않은 코디가 있어요</h2>
+            <p style={{ margin: '0 4px 8px', fontSize: 14, color: 'var(--muted)' }}>{s.dest === 'none' ? '새 코디' : dests.find((d) => d[0] === s.dest)?.[1]}로 저장할까요?</p>
+            <button type="button" className="btn-primary" onClick={() => { persist(); set({ leaveOpen: false }); leave() }}>저장하고 나가기</button>
+            <button type="button" className="btn-secondary" onClick={() => { set({ leaveOpen: false }); leave() }}>저장 안 하고 나가기</button>
           </section>
         </div>
       )}
@@ -513,7 +569,7 @@ export default function Board() {
 
   function toggleItem(c) {
     if (onBoard[c.id]) commit(s.placed.filter((p) => p.id !== c.id), { sel: s.sel === c.id ? null : s.sel })
-    else commit(s.placed.concat([{ id: c.id, x: 30, y: 30, w: 36, r: 0, z: s.nextZ }]), { sel: c.id, nextZ: s.nextZ + 1 })
+    else commit(s.placed.concat([spotFor(c, s.placed, itemById, s.nextZ)]), { sel: c.id, nextZ: s.nextZ + 1 })
   }
 }
 

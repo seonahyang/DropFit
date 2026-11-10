@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import LookThumb from '../components/LookThumb.jsx'
-import { IconBack, IconPlus, IconCheck } from '../components/Icons.jsx'
+import { IconBack, IconPlus, IconCheck, IconMore } from '../components/Icons.jsx'
 import { useStore, tripSummary, dayDate } from '../data/store.jsx'
 import { won } from '../data/samples.js'
 import { tripMeta } from './Boards.jsx'
@@ -9,8 +9,11 @@ import { tripMeta } from './Boards.jsx'
 // 시안: AppTrip.dc.html
 export default function Trip() {
   const { tripId } = useParams()
-  const { trips, looks, itemById, togglePacked } = useStore()
+  const { trips, looks, itemById, togglePacked, deleteTrip } = useStore()
+  const navigate = useNavigate()
   const [view, setView] = useState('days')
+  const [menu, setMenu] = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
   const trip = trips.find((t) => t.id === tripId)
   if (!trip) return <Navigate to="/boards" replace />
 
@@ -20,7 +23,10 @@ export default function Trip() {
   return (
     <div className="app">
       <header style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2, padding: 'calc(10px + var(--safe-t)) 16px 0 8px' }}>
-        <Link to="/boards" aria-label="코디 모음으로" className="icon-btn"><IconBack /></Link>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <Link to="/boards" aria-label="코디 모음으로" className="icon-btn"><IconBack /></Link>
+          <button type="button" className="icon-btn" aria-label="여행 메뉴" onClick={() => setMenu(true)}><IconMore size={24} /></button>
+        </div>
         <div style={{ paddingLeft: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <h1 style={{ margin: 0, fontSize: 28, fontWeight: 900, letterSpacing: '-0.04em' }}>{trip.name}</h1>
           <p style={{ margin: 0, fontSize: 14, color: 'var(--muted-2)' }}>{tripMeta(trip, sum)}</p>
@@ -88,6 +94,21 @@ export default function Trip() {
           </div>
         )}
       </main>
+
+      {menu && (
+        <div className="sheet-wrap">
+          <button type="button" className="sheet-scrim" aria-label="닫기" onClick={() => { setMenu(false); setConfirmDel(false) }} />
+          <section className="sheet" aria-label="여행 메뉴" style={{ gap: 8, paddingBottom: 'calc(26px + var(--safe-b))' }}>
+            <span className="grabber" aria-hidden="true" />
+            <h2 style={{ margin: '4px 4px 2px', fontSize: 20, fontWeight: 900, letterSpacing: '-0.03em' }}>{trip.name}</h2>
+            <p style={{ margin: '0 4px 8px', fontSize: 14, color: 'var(--muted)' }}>여행을 지워도 코디는 "모든 코디"에 남아요</p>
+            <button type="button" onClick={() => { if (!confirmDel) return setConfirmDel(true); deleteTrip(trip.id); navigate('/boards', { replace: true }) }}
+              style={{ minHeight: 56, padding: '0 16px', background: confirmDel ? '#FF453A' : 'var(--surface-2)', border: 0, borderRadius: 20, color: confirmDel ? '#FFFFFF' : '#FF6961', fontSize: 15, fontWeight: 700, textAlign: 'left', cursor: 'pointer' }}>
+              {confirmDel ? '한 번 더 누르면 삭제돼요' : '여행 삭제'}
+            </button>
+          </section>
+        </div>
+      )}
     </div>
   )
 }
