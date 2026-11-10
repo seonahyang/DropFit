@@ -73,7 +73,7 @@ export default function Trip() {
                       <li key={k}>
                         <button type="button" aria-pressed={on} onClick={() => togglePacked(trip.id, k)}
                           style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '6px 12px 6px 6px', background: 'var(--surface-1)', border: 0, borderRadius: 22, textAlign: 'left', cursor: 'pointer' }}>
-                          <span style={{ flexShrink: 0, width: 72, height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, background: it.tint, borderRadius: 18, opacity: on ? 0.5 : 1 }}>
+                          <span style={{ flexShrink: 0, width: 72, height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, background: 'var(--card-bg)', borderRadius: 18, opacity: on ? 0.5 : 1 }}>
                             <img src={it.src} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                           </span>
                           <span style={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>

@@ -19,7 +19,7 @@ export async function renderLookPng(look, itemById, width = 1080) {
   canvas.width = W
   canvas.height = H
   const ctx = canvas.getContext('2d')
-  ctx.fillStyle = look.bg || '#F6F5F2'
+  ctx.fillStyle = '#F2F2F3' // 화면의 --board-bg와 같은 톤
   ctx.fillRect(0, 0, W, H)
 
   const pieces = [...look.placed].sort((a, b) => a.z - b.z)

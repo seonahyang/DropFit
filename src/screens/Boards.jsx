@@ -12,7 +12,7 @@ const EMPTY = '#1C1C1E'
 function Cover({ look, itemById, row, x, y, w }) {
   const pieces = look ? [...look.placed].sort((a, b) => a.z - b.z).slice(0, 2) : []
   return (
-    <span style={{ position: 'relative', display: 'block', gridRow: row, overflow: 'hidden', background: look ? look.bg : EMPTY }}>
+    <span style={{ position: 'relative', display: 'block', gridRow: row, overflow: 'hidden', background: look ? 'var(--board-bg)' : EMPTY }}>
       {pieces.map((q, i) => itemById[q.id] && (
         <img key={i} src={itemById[q.id].src} alt=""
           style={{ position: 'absolute', left: (x + i * 42) + '%', top: (y + i * 6) + '%', width: w + '%', transform: `rotate(${q.r}deg)`, filter: 'drop-shadow(0 3px 3px rgba(0,0,0,.25))' }} />

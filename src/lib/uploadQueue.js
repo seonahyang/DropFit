@@ -89,9 +89,9 @@ async function processOne(c) {
     console.error('배경 제거 실패', e)
     // 실패하면 원본을 그대로 두고 "확인 필요"로 — 편집기 지우개로 직접 지울 수 있음
     try {
-      const { blob } = await downscale(c.file, 1600)
-      const bmp = await createImageBitmap(blob)
-      const result = { blob, origBlob: blob, vw: bmp.width, vh: bmp.height, url: URL.createObjectURL(blob), failed: true }
+      // 투명 배경 PNG(쇼핑몰 누끼 등)는 그대로 살리고 여백만 자름
+      const { blob } = await downscale(c.file, 1600, 'image/png')
+      const result = { ...(await trimToContent(blob, blob)), failed: true }
       patch(c.key, { st: 'check', pct: 100, phase: '', result, error: String((e && e.message) || e) })
     } catch (e2) {
       patch(c.key, { st: 'check', pct: 100, phase: '', error: String((e && e.message) || e) })
@@ -115,7 +115,7 @@ async function trimToContent(cutBlob, origBlob) {
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const a = data[(y * W + x) * 4 + 3]
-      if (a > 16) {
+      if (a > 32) {
         if (x < minX) minX = x
         if (x > maxX) maxX = x
         if (y < minY) minY = y
@@ -146,4 +146,11 @@ async function trimToContent(cutBlob, origBlob) {
   cutBmp.close && cutBmp.close()
   origBmp.close && origBmp.close()
   return { blob, origBlob: orig, vw: cw, vh: ch, url: URL.createObjectURL(blob), needsCheck }
+}
+
+// 옷장에 넣기 전에 입력한 정보(이름·브랜드·종류·계절·가격)
+export function setMeta(key, meta) {
+  const c = cards.find((x) => x.key === key)
+  if (!c) return
+  patch(key, { meta: { ...(c.meta || {}), ...meta } })
 }

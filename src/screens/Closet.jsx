@@ -61,7 +61,7 @@ export default function Closet() {
             {list.map((x) => (
               <article key={x.id} style={{ margin: '0 0 8px' }}>
                 <button type="button" onClick={() => setSheet(x.id)} aria-label={`${x.name} 자세히 보기`}
-                  style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: x.h, padding: 14, background: x.tint, border: 0, borderRadius: 'var(--r-card)', cursor: 'pointer' }}>
+                  style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: x.h, padding: 14, background: 'var(--card-bg)', border: 0, borderRadius: 'var(--r-card)', cursor: 'pointer' }}>
                   <img src={x.src} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                   {tab === 'buy' && (
                     <span style={{ position: 'absolute', left: 10, bottom: 10, padding: '5px 10px', background: 'rgba(0,0,0,.72)', color: '#FFFFFF', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>{won(x.price)}</span>
@@ -99,7 +99,7 @@ function ItemSheet({ sel, onClose, updateItem, onBoard, onEdit, onDelete }) {
       <button type="button" className="sheet-scrim" aria-label="닫기" onClick={onClose} />
       <section className="sheet" aria-label="옷 상세">
         <span className="grabber" aria-hidden="true" />
-        <div style={{ position: 'relative', height: 200, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: sel.tint, borderRadius: 'var(--r-card)' }}>
+        <div style={{ position: 'relative', height: 200, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'var(--card-bg)', borderRadius: 'var(--r-card)' }}>
           <img src={sel.src} alt={sel.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
           <button type="button" onClick={onEdit}
             style={{ position: 'absolute', right: 8, bottom: 8, display: 'inline-flex', alignItems: 'center', minHeight: 36, padding: '0 12px', background: 'rgba(0,0,0,.78)', color: '#FFFFFF', border: 0, borderRadius: 999, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>

@@ -29,7 +29,7 @@ export async function removeBg(input, cfg) {
 }
 
 // 큰 폰 사진(1200만 화소)은 먼저 줄여서 넘기면 디코딩·추론이 빨라짐
-export async function downscale(file, maxSide = 1600) {
+export async function downscale(file, maxSide = 1600, type = 'image/jpeg') {
   const bmp = await createImageBitmap(file)
   const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height))
   const w = Math.round(bmp.width * k)
@@ -39,7 +39,7 @@ export async function downscale(file, maxSide = 1600) {
   c.height = h
   c.getContext('2d').drawImage(bmp, 0, 0, w, h)
   bmp.close && bmp.close()
-  const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.92))
+  const blob = await new Promise((r) => c.toBlob(r, type, 0.92))
   return { blob, width: w, height: h }
 }
 

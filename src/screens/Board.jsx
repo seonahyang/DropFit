@@ -10,7 +10,7 @@ const RATIO_MAP = { '1:1': [1, 1], '4:5': [4, 5], '9:16': [9, 16] }
 const PANEL_MIN = 264
 const PANEL_PEEK = 36 // 아래로 내렸을 때 손잡이만 보이는 높이
 const PANEL_MAX = 640
-const DEFAULT_BG = '#F6F5F2'
+const DEFAULT_BG = '#F2F2F3' // 화면 --board-bg와 같은 톤
 
 // 새로 놓는 옷의 기본 자리(종류별 플랫레이 구도, 퍼센트). 같은 종류가 또 오면 조금씩 비켜 놓음
 const SPOTS = {
@@ -27,7 +27,7 @@ export function spotFor(item, placed, itemById, z) {
 function initState(lookId, look, q, trips) {
   const base = { cat: 'all', sel: null, past: [], future: [], saveOpen: false, toast: '', panelH: PANEL_MIN, panelDrag: false, menu: false, more: false, scope: 'all', saving: false }
   if (look) {
-    return { ...base, ratio: look.ratio, bg: look.bg || DEFAULT_BG, placed: look.placed.map((p) => ({ ...p })), lookName: look.name,
+    return { ...base, ratio: look.ratio, bg: DEFAULT_BG, placed: look.placed.map((p) => ({ ...p })), lookName: look.name,
       dest: look.tripId ? `${look.tripId}:${look.day}` : 'none', setup: false, season: 'all',
       nextZ: Math.max(20, ...look.placed.map((p) => p.z + 1)) }
   }

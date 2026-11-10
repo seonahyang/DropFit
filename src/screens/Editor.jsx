@@ -10,6 +10,39 @@ const CHECKER = 'repeating-conic-gradient(#D9DADD 0 25%, #FFFFFF 0 50%)'
 const BG_MAP = { checker: CHECKER, white: '#FFFFFF', black: '#2C2C2E', cobalt: '#1F3BE0', pink: '#F4B9C6' }
 const BG_LABEL = { checker: '체커보드', white: '흰색', black: '검정', cobalt: '코발트', pink: '분홍' }
 const MAX_SIDE = 1600
+
+// 옷이 있는(불투명) 부분만 남기고 투명 여백을 잘라 냄. 원본도 같은 영역으로 잘라 복원용으로 맞춤
+function trimCanvases(cut, orig) {
+  const W = cut.width
+  const H = cut.height
+  const data = cut.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data
+  let minX = W, minY = H, maxX = -1, maxY = -1
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (data[(y * W + x) * 4 + 3] > 24) {
+        if (x < minX) minX = x
+        if (x > maxX) maxX = x
+        if (y < minY) minY = y
+        if (y > maxY) maxY = y
+      }
+    }
+  }
+  if (maxX < 0) return null // 전부 지운 경우는 그대로
+  const pad = Math.max(4, Math.round(Math.max(maxX - minX, maxY - minY) * 0.03))
+  minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad)
+  maxX = Math.min(W - 1, maxX + pad); maxY = Math.min(H - 1, maxY + pad)
+  const w = maxX - minX + 1
+  const h = maxY - minY + 1
+  if (w >= W - 2 && h >= H - 2) return { cut, orig, w: W, h: H } // 이미 꽉 참
+  const crop = (src) => {
+    const c = document.createElement('canvas')
+    c.width = w
+    c.height = h
+    c.getContext('2d').drawImage(src, minX, minY, w, h, 0, 0, w, h)
+    return c
+  }
+  return { cut: crop(cut), orig: crop(orig), w, h }
+}
 const UNDO_LIMIT = 12
 
 function loadImage(src) {
@@ -156,6 +189,12 @@ export default function Editor() {
   }
   const onUp = () => { strokeRef.current = null; setCursor(null) }
 
+  // 지운 게 없어도 여백이 크면 확정 때 잘라 줌
+  const hasSlack = () => {
+    const t = trimCanvases(canvasRef.current, origRef.current)
+    return !!t && (t.w < dims.current.w - 2 || t.h < dims.current.h - 2)
+  }
+
   const undo = () => {
     const snap = undoRef.current.pop()
     if (!snap) return
@@ -165,16 +204,16 @@ export default function Editor() {
 
   const confirm = async () => {
     if (!ready) return navigate(-1)
-    if (undoRef.current.length === 0 && item.blob) return navigate(-1)
+    if (undoRef.current.length === 0 && item.blob && !hasSlack()) return navigate(-1)
     setSaving(true)
-    const blob = await new Promise((r) => canvasRef.current.toBlob(r, 'image/png'))
-    const change = { blob, src: URL.createObjectURL(blob), vw: dims.current.w, vh: dims.current.h }
-    if (!item.origBlob) {
-      // 샘플(SVG) 옷을 처음 고치는 경우: 복원용 원본도 같이 저장
-      const ob = await new Promise((r) => origRef.current.toBlob(r, 'image/png'))
-      change.origBlob = ob
-      change.srcOrig = URL.createObjectURL(ob)
-    }
+    const t = trimCanvases(canvasRef.current, origRef.current) || { cut: canvasRef.current, orig: origRef.current, w: dims.current.w, h: dims.current.h }
+    const blob = await new Promise((r) => t.cut.toBlob(r, 'image/png'))
+    const change = { blob, src: URL.createObjectURL(blob), vw: t.w, vh: t.h }
+    // 잘린 영역에 맞춘 원본도 함께 저장(다음에 고칠 때 복원용)
+    const ob = await new Promise((r) => t.orig.toBlob(r, 'image/png'))
+    change.origBlob = ob
+    change.srcOrig = URL.createObjectURL(ob)
+    if (item.srcOrig && item.origBlob) URL.revokeObjectURL(item.srcOrig)
     if (item.blob && item.src) URL.revokeObjectURL(item.src)
     updateItem(item.id, change)
     navigate(-1)

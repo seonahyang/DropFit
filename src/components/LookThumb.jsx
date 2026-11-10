@@ -25,7 +25,7 @@ export default function LookThumb({ look, itemById, style, children }) {
   return (
     <span
       style={{
-        position: 'relative', display: 'block', overflow: 'hidden', background: look.bg,
+        position: 'relative', display: 'block', overflow: 'hidden', background: 'var(--board-bg)',
         borderRadius: 'var(--r-card)', aspectRatio: RATIO_CSS[look.ratio] || '4 / 5', ...style,
       }}
     >

@@ -33,4 +33,7 @@ export const SAMPLE_LOOKS = {
   weekend: [p('knit', 4, 6, 50, -5, 1), p('skirt', 50, 26, 46, 5, 2), p('loafers', 8, 58, 34, 8, 3), p('beret', 56, 4, 32, 10, 4)],
 }
 
+// 카드·코디 배경은 전부 이 한 톤(흰색과 회색 사이)
+export const NEUTRAL = '#F2F2F3'
+
 export const won = (n) => '₩' + (n || 0).toLocaleString('ko-KR')
