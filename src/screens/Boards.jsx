@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import BottomNav from '../components/BottomNav.jsx'
 import LookThumb from '../components/LookThumb.jsx'
-import { IconPlus } from '../components/Icons.jsx'
+import { IconPlus, IconSettings } from '../components/Icons.jsx'
 import { useStore, tripSummary } from '../data/store.jsx'
 import { SEASONS, SEASON_LABEL, NOTES } from '../data/samples.js'
 
@@ -45,8 +45,9 @@ export default function Boards() {
   return (
     <div className="app">
       <main className="scroll" style={{ padding: '0 0 104px' }}>
-        <header style={{ padding: 'calc(22px + var(--safe-t)) 16px 8px' }}>
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'calc(22px + var(--safe-t)) 8px 8px 16px' }}>
           <Link to="/" style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.03em' }}>DropFit</Link>
+          <Link to="/settings" aria-label="설정" className="icon-btn" style={{ color: 'var(--muted-2)' }}><IconSettings /></Link>
         </header>
 
         <div className="tabs" role="group" aria-label="코디 보기" style={{ position: 'sticky', top: 0, zIndex: 4, background: 'var(--bg)' }}>

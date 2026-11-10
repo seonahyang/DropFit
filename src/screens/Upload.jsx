@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { IconClose, IconPhoto } from '../components/Icons.jsx'
 import { useStore, uid } from '../data/store.jsx'
 import { subscribe, addFiles, markAdded, clearAdded } from '../lib/uploadQueue.js'
+import { subscribeModel, warmModel } from '../lib/modelWarm.js'
 
 // 시안: AppUpload.dc.html — 사진 여러 장 → 장별 자동 배경 제거 → 완료/확인 필요 → 옷장에 넣기
 const TINTS = ['#F3E6D6', '#C9D8E8', '#E4EEE3', '#FBF0DC', '#F6E8EA', '#FFFFFF', '#BFC0C9']
@@ -19,6 +20,10 @@ export default function Upload() {
   const [dest, setDest] = useState(() => sessionStorage.getItem('uploadDest') || 'own')
   const [cards, setCards] = useState([])
   useEffect(() => subscribe(setCards), [])
+  // 화면에 들어오면 배경 제거 모델을 미리 준비(이미 받았으면 캐시에서 금방 끝남)
+  const [model, setModel] = useState({ status: 'idle', pct: 0 })
+  useEffect(() => subscribeModel(setModel), [])
+  useEffect(() => { warmModel() }, [])
 
   const pickDest = (k) => { setDest(k); try { sessionStorage.setItem('uploadDest', k) } catch (e) { /* ignore */ } }
 
@@ -104,7 +109,9 @@ export default function Upload() {
       </main>
 
       <footer style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 16px calc(20px + var(--safe-b))', background: '#000000' }}>
-        <p style={{ margin: 0, fontSize: 12, textAlign: 'center', color: 'var(--muted-2)' }}>사진은 이 기기 안에서만 처리돼요</p>
+        <p style={{ margin: 0, fontSize: 12, textAlign: 'center', color: 'var(--muted-2)' }}>
+          {model.status === 'loading' ? `배경 제거 준비 중 ${model.pct}% · ` : model.status === 'error' ? '배경 제거를 준비하지 못했어요(네트워크 확인) · ' : ''}사진은 이 기기 안에서만 처리돼요
+        </p>
         <button type="button" className="btn-primary" disabled={ready.length === 0} onClick={putAll}>완료된 {ready.length}벌 {destLabel}에 넣기</button>
       </footer>
     </div>

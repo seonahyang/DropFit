@@ -34,6 +34,12 @@ export default defineConfig({
             options: { cacheName: 'fonts', expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 } },
           },
           {
+            // 배경 제거 엔진(onnxruntime wasm/mjs) — 크기가 커서 미리 받지 않고 처음 쓸 때 캐시
+            urlPattern: ({ url }) => url.origin === self.location.origin && /\/assets\/.*\.(wasm|mjs)$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: { cacheName: 'bg-engine', expiration: { maxEntries: 10 } },
+          },
+          {
             // 배경 제거 모델(onnx/wasm) — 처음 한 번 받은 뒤 오프라인에서도 쓰도록 캐시
             urlPattern: /^https:\/\/staticimgly\.com\//,
             handler: 'CacheFirst',
