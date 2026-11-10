@@ -27,6 +27,7 @@ export default function App() {
           <Route path="/trip/:tripId" element={<Trip />} />
           <Route path="/upload" element={<Upload />} />
           <Route path="/editor/:itemId" element={<Editor />} />
+          <Route path="/editor/upload/:cardKey" element={<Editor />} />
           <Route path="/board/:lookId" element={<BoardRoute />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/lab" element={<Lab />} />

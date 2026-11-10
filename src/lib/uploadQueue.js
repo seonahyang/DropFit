@@ -154,3 +154,11 @@ export function setMeta(key, meta) {
   if (!c) return
   patch(key, { meta: { ...(c.meta || {}), ...meta } })
 }
+
+// 옷 추가 화면에서 편집기로 고친 컷을 카드에 반영(옷장에는 아직 넣지 않음)
+export function setResult(key, change) {
+  const c = cards.find((x) => x.key === key)
+  if (!c || !c.result) return
+  if (change.url && c.result.url && change.url !== c.result.url) URL.revokeObjectURL(c.result.url)
+  patch(key, { st: 'done', result: { ...c.result, ...change, failed: false, needsCheck: false } })
+}

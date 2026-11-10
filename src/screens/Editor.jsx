@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { IconBack, IconUndo } from '../components/Icons.jsx'
 import { useStore } from '../data/store.jsx'
+import { getCards, setResult } from '../lib/uploadQueue.js'
 
 // 시안: AppEditor.dc.html
 // 지우개: 결과 캔버스에서 그 자리를 투명하게(destination-out)
@@ -55,10 +56,15 @@ function loadImage(src) {
 }
 
 export default function Editor() {
-  const { itemId } = useParams()
+  const { itemId, cardKey } = useParams()
   const navigate = useNavigate()
   const { itemById, updateItem } = useStore()
-  const item = itemById[itemId]
+  // /editor/upload/:cardKey → 옷 추가 화면의 카드(아직 옷장에 안 넣은 컷)를 고침
+  const card = cardKey ? getCards().find((c) => c.key === cardKey && c.result) : null
+  const [cardOrigUrl] = useState(() => (card ? URL.createObjectURL(card.result.origBlob) : ''))
+  const item = card
+    ? { id: card.key, name: (card.meta && card.meta.name) || '새 옷', src: card.result.url, srcOrig: cardOrigUrl, blob: card.result.blob, origBlob: card.result.origBlob, vw: card.result.vw, vh: card.result.vh }
+    : itemById[itemId]
 
   const [tool, setTool] = useState('erase')
   const [size, setSize] = useState(40)
@@ -119,7 +125,7 @@ export default function Editor() {
     return () => ro.disconnect()
   }, [ready])
 
-  if (!item) return <Navigate to="/" replace />
+  if (!item) return <Navigate to={cardKey ? '/upload' : '/'} replace />
 
   const ctx = () => canvasRef.current.getContext('2d', { willReadFrequently: true })
   const toCanvas = (e) => {
@@ -215,7 +221,12 @@ export default function Editor() {
     change.srcOrig = URL.createObjectURL(ob)
     if (item.srcOrig && item.origBlob) URL.revokeObjectURL(item.srcOrig)
     if (item.blob && item.src) URL.revokeObjectURL(item.src)
-    updateItem(item.id, change)
+    if (card) {
+      URL.revokeObjectURL(change.srcOrig)
+      setResult(card.key, { blob: change.blob, url: change.src, origBlob: change.origBlob, vw: change.vw, vh: change.vh })
+    } else {
+      updateItem(item.id, change)
+    }
     navigate(-1)
   }
 

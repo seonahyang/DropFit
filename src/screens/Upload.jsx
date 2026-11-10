@@ -61,11 +61,9 @@ export default function Upload() {
   }
 
   const fix = (c) => {
-    const it = toItem(c)
-    addItems([it])
+    // 옷장에 넣지 않고 이 카드의 컷만 고침 → 확정하면 이 화면으로 돌아와 카드가 바뀜
     setSheet(null)
-    markAdded([c.key])
-    navigate(`/editor/${it.id}`, { state: { from: 'upload' } })
+    navigate(`/editor/upload/${c.key}`)
   }
 
   return (
