@@ -19,12 +19,12 @@ export function seed() {
   ]
   const L = (id, name, bg, key, tripId, day, t) => ({ id, name, ratio: '4:5', bg, placed: SAMPLE_LOOKS[key].map((q) => ({ ...q })), tripId, day, updatedAt: t })
   const looks = [
-    L('jp1', '일본 1일차', '#FFFFFF', 'jp1', 'jp', 1, 6),
+    L('jp1', '일본 3박 4일 · 1일차', '#FFFFFF', 'jp1', 'jp', 1, 6),
     L('weekend', '주말 약속', '#F4C9D2', 'weekend', null, null, 5),
-    L('jp2', '일본 2일차', '#C9D8E8', 'jp2', 'jp', 2, 4),
-    L('je1', '제주 1일차', '#F3E6D6', 'je1', 'je', 1, 3),
-    L('jp4', '일본 4일차', '#F4C9D2', 'jp4', 'jp', 4, 2),
-    L('je2', '제주 2일차', '#FFFFFF', 'je2', 'je', 2, 1),
+    L('jp2', '일본 3박 4일 · 2일차', '#C9D8E8', 'jp2', 'jp', 2, 4),
+    L('je1', '제주 2박 3일 · 1일차', '#F3E6D6', 'je1', 'je', 1, 3),
+    L('jp4', '일본 3박 4일 · 4일차', '#F4C9D2', 'jp4', 'jp', 4, 2),
+    L('je2', '제주 2박 3일 · 2일차', '#FFFFFF', 'je2', 'je', 2, 1),
   ]
   return { items, looks, trips }
 }
